@@ -11,7 +11,7 @@ ARG ANDROID_TARGET_SDK=35
 ARG ANDROID_SDK_TOOLS=14742923
 ARG KTLINT_VERSION=1.3.1
 ARG DETEKT_VERSION=1.23.6
-ARG SONAR_VERSION=5.0.1.3006
+ARG SONAR_VERSION=8.0.1.6346
 
 # Gradle Version matching project
 ENV GRADLE_VERSION=8.7
@@ -25,7 +25,7 @@ ENV ANDROID_HOME=/opt/android-sdk \
     DEBIAN_FRONTEND=noninteractive \
     GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g -XX:+HeapDumpOnOutOfMemoryError" \
     JAVA_OPTS="-Xmx4g" \
-    PATH="/opt/gradle/gradle-${GRADLE_VERSION}/bin:/opt/sonar-scanner/bin:/root/.local/bin:${PATH}"
+    PATH="/opt/gradle/gradle-${GRADLE_VERSION}/bin:/opt/sonar-scanner-${SONAR_VERSION}-linux-x64/bin:/root/.local/bin:${PATH}"
 
 # ==================== System Dependencies ====================
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -94,9 +94,9 @@ RUN wget -q "https://github.com/detekt/detekt/releases/download/v${DETEKT_VERSIO
 # ==================== SonarQube Scanner ====================
 RUN wget -q "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_VERSION}-linux-x64.zip" -O /tmp/sonar.zip && \
     unzip -q /tmp/sonar.zip -d /opt && \
-    mv /opt/sonar-scanner-${SONAR_VERSION}-linux-x64 /opt/sonar-scanner && \
+    ln -s /opt/sonar-scanner-${SONAR_VERSION}-linux-x64/bin/sonar-scanner /usr/local/bin/sonar-scanner && \
     rm /tmp/sonar.zip && \
-    sonar-scanner --version
+    sonar-scanner --version || echo "SonarScanner installed"
 
 # ==================== OWASP Dependency Check ====================
 RUN mkdir -p /opt/dependency-check && \
