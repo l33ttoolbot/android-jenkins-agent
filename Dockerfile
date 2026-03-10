@@ -4,7 +4,21 @@
 
 FROM eclipse-temurin:17-jdk-jammy
 
-# Build Arguments
+# ==================== Version Labels ====================
+ARG VERSION=1.0.0
+ARG BUILD_DATE
+ARG VCS_REF
+
+LABEL org.opencontainers.image.title="Android Jenkins Agent" \
+      org.opencontainers.image.description="Android CI/CD Build Agent with Java 17, Gradle 8.7, Android SDK 35, ktlint, detekt, SonarQube" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.source="https://github.com/l33ttoolbot/android-jenkins-agent" \
+      org.opencontainers.image.vendor="Beemaster" \
+      org.opencontainers.image.licenses="MIT"
+
+# ==================== Build Arguments ====================
 ARG ANDROID_COMPILE_SDK=35
 ARG ANDROID_BUILD_TOOLS=35.0.0
 ARG ANDROID_TARGET_SDK=35
