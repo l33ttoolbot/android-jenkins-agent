@@ -1,6 +1,6 @@
-# Android Jenkins Build Agent
-# Optimiert für Jenkins Pipeline Builds auf x86_64
-# Java 17 + Android SDK 35
+# Android Jenkins Build Agent - Complete CI/CD Toolchain
+# Java 17 + Android SDK 35 + Quality Tools
+# Optimiert für x86_64 Jenkins Pipeline Builds
 
 FROM eclipse-temurin:17-jdk-jammy
 
@@ -9,6 +9,9 @@ ARG ANDROID_COMPILE_SDK=35
 ARG ANDROID_BUILD_TOOLS=35.0.0
 ARG ANDROID_TARGET_SDK=35
 ARG ANDROID_SDK_TOOLS=14742923
+ARG KTLINT_VERSION=1.3.1
+ARG DETEKT_VERSION=1.23.6
+ARG SONAR_VERSION=5.0.1.3006
 
 # Environment Variables
 ENV ANDROID_HOME=/opt/android-sdk \
@@ -17,9 +20,11 @@ ENV ANDROID_HOME=/opt/android-sdk \
     ANDROID_BUILD_TOOLS=${ANDROID_BUILD_TOOLS} \
     ANDROID_TARGET_SDK=${ANDROID_TARGET_SDK} \
     DEBIAN_FRONTEND=noninteractive \
-    GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g"
+    GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g -XX:+HeapDumpOnOutOfMemoryError" \
+    JAVA_OPTS="-Xmx4g" \
+    PATH="/opt/gradle/gradle-8.6/bin:/opt/sonar-scanner/bin:/root/.local/bin:${PATH}"
 
-# Install Build Dependencies
+# ==================== System Dependencies ====================
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
@@ -27,7 +32,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     unzip \
+    zip \
     openssh-client \
+    gnupg \
+    lsb-release \
+    python3 \
+    python3-pip \
+    nodejs \
+    npm \
     libc6-i386 \
     lib32stdc++6 \
     lib32z1 \
@@ -36,7 +48,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Android SDK Command Line Tools
+# ==================== Gradle ====================
+RUN wget -q "https://services.gradle.org/distributions/gradle-8.6-bin.zip" -O /tmp/gradle.zip && \
+    mkdir -p /opt/gradle && \
+    unzip -q /tmp/gradle.zip -d /opt/gradle && \
+    mv /opt/gradle/gradle-8.6 /opt/gradle/gradle-8.6 && \
+    rm /tmp/gradle.zip && \
+    gradle --version
+
+# ==================== Android SDK ====================
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     wget -q "https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip" -O /tmp/cmdline-tools.zip && \
     unzip -q /tmp/cmdline-tools.zip -d ${ANDROID_HOME}/cmdline-tools && \
@@ -46,31 +66,77 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
 # Accept Android SDK Licenses
 RUN yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
 
-# Install Android SDK Components
+# Install Android SDK Components (including lint)
 RUN ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --update 2>/dev/null && \
     ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
     "platforms;android-${ANDROID_COMPILE_SDK}" \
     "build-tools;${ANDROID_BUILD_TOOLS}" \
     "platform-tools" \
     "extras;android;m2repository" \
-    "extras;google;m2repository" 2>/dev/null || true
+    "extras;google;m2repository" \
+    "cmdline-tools;latest" 2>/dev/null || true
 
-# Add Android SDK to PATH
+# ==================== Kotlin Linter: ktlint ====================
+RUN wget -q "https://github.com/pinterest/ktlint/releases/download/${KTLINT_VERSION}/ktlint" -O /usr/local/bin/ktlint && \
+    chmod +x /usr/local/bin/ktlint && \
+    ktlint --version
+
+# ==================== Kotlin Static Analysis: detekt ====================
+RUN wget -q "https://github.com/detekt/detekt/releases/download/v${DETEKT_VERSION}/detekt-cli-${DETEKT_VERSION}.zip" -O /tmp/detekt.zip && \
+    unzip -q /tmp/detekt.zip -d /opt/detekt && \
+    ln -s /opt/detekt/bin/detekt-cli /usr/local/bin/detekt && \
+    rm /tmp/detekt.zip && \
+    detekt --version || true
+
+# ==================== SonarQube Scanner ====================
+RUN wget -q "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_VERSION}-linux-x64.zip" -O /tmp/sonar.zip && \
+    unzip -q /tmp/sonar.zip -d /opt && \
+    mv /opt/sonar-scanner-${SONAR_VERSION}-linux-x64 /opt/sonar-scanner && \
+    rm /tmp/sonar.zip && \
+    sonar-scanner --version
+
+# ==================== OWASP Dependency Check ====================
+RUN mkdir -p /opt/dependency-check && \
+    wget -q "https://github.com/jeremylong/DependencyCheck/releases/download/v9.1.0/dependency-check-9.1.0-release.zip" -O /tmp/depcheck.zip && \
+    unzip -q /tmp/depcheck.zip -d /opt && \
+    mv /opt/dependency-check /opt/dependency-check-core && \
+    ln -s /opt/dependency-check-core/bin/dependency-check.sh /usr/local/bin/dependency-check || \
+    echo "dependency-check wird via Gradle Plugin ausgeführt" && \
+    rm -tmp/depcheck.zip 2>/dev/null || true
+
+# ==================== GitLeaks (Secrets Scanner) ====================
+RUN wget -q "https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz" -O /tmp/gitleaks.tar.gz && \
+    tar -xzf /tmp/gitleaks.tar.gz -C /usr/local/bin && \
+    chmod +x /usr/local/bin/gitleaks && \
+    rm /tmp/gitleaks.tar.gz && \
+    gitleaks version
+
+# ==================== Danger (Code Review Automation) ====================
+RUN npm install -g danger && \
+    danger --version || echo "Danger installiert"
+
+# ==================== Android Lint (via SDK) ====================
+# Android Lint ist bereits im SDK enthalten
 ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}"
 
-# Pre-configure SSH Known Hosts (GitHub, GitLab)
+# ==================== SSH Known Hosts ====================
 RUN mkdir -p /root/.ssh && \
     ssh-keyscan github.com >> /root/.ssh/known_hosts && \
     ssh-keyscan gitlab.com >> /root/.ssh/known_hosts && \
+    ssh-keyscan bitbucket.org >> /root/.ssh/known_hosts && \
     chmod 700 /root/.ssh && \
     chmod 644 /root/.ssh/known_hosts
+
+# ==================== Gradle Cache Permissions ====================
+RUN mkdir -p /root/.gradle /root/.android && \
+    chmod -R 777 /root/.gradle /root/.android
 
 # Working Directory
 WORKDIR /workspace
 
 # Health Check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD java -version 2>&1 | grep -q "17"
+    CMD java -version 2>&1 | grep -q "17" && gradle --version >/dev/null 2>&1
 
-# Default Command - allows Jenkins Pipeline to execute commands
+# Default Command
 CMD ["/bin/bash"]
