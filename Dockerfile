@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     unzip \
+    openssh-client \
     libc6-i386 \
     lib32stdc++6 \
     lib32z1 \
