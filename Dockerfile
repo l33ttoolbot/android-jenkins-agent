@@ -13,6 +13,9 @@ ARG KTLINT_VERSION=1.3.1
 ARG DETEKT_VERSION=1.23.6
 ARG SONAR_VERSION=5.0.1.3006
 
+# Gradle Version matching project
+ENV GRADLE_VERSION=8.7
+
 # Environment Variables
 ENV ANDROID_HOME=/opt/android-sdk \
     ANDROID_SDK_ROOT=/opt/android-sdk \
@@ -22,7 +25,7 @@ ENV ANDROID_HOME=/opt/android-sdk \
     DEBIAN_FRONTEND=noninteractive \
     GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g -XX:+HeapDumpOnOutOfMemoryError" \
     JAVA_OPTS="-Xmx4g" \
-    PATH="/opt/gradle/gradle-8.6/bin:/opt/sonar-scanner/bin:/root/.local/bin:${PATH}"
+    PATH="/opt/gradle/gradle-${GRADLE_VERSION}/bin:/opt/sonar-scanner/bin:/root/.local/bin:${PATH}"
 
 # ==================== System Dependencies ====================
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -49,10 +52,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ==================== Gradle ====================
-RUN wget -q "https://services.gradle.org/distributions/gradle-8.6-bin.zip" -O /tmp/gradle.zip && \
+RUN wget -q "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -O /tmp/gradle.zip && \
     mkdir -p /opt/gradle && \
     unzip -q /tmp/gradle.zip -d /opt/gradle && \
-    mv /opt/gradle/gradle-8.6 /opt/gradle/gradle-8.6 && \
+    mv /opt/gradle/gradle-${GRADLE_VERSION} /opt/gradle/gradle-${GRADLE_VERSION} && \
+    ln -s /opt/gradle/gradle-${GRADLE_VERSION}/bin/gradle /usr/local/bin/gradle && \
     rm /tmp/gradle.zip && \
     gradle --version
 
