@@ -55,7 +55,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN wget -q "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -O /tmp/gradle.zip && \
     mkdir -p /opt/gradle && \
     unzip -q /tmp/gradle.zip -d /opt/gradle && \
-    mv /opt/gradle/gradle-${GRADLE_VERSION} /opt/gradle/gradle-${GRADLE_VERSION} && \
     ln -s /opt/gradle/gradle-${GRADLE_VERSION}/bin/gradle /usr/local/bin/gradle && \
     rm /tmp/gradle.zip && \
     gradle --version
