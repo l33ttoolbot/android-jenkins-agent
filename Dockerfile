@@ -155,5 +155,7 @@ WORKDIR /workspace
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD java -version 2>&1 | grep -q "17" && gradle --version >/dev/null 2>&1
 
-# Default Command
-CMD ["/bin/bash"]
+# Default Command - Keep container running for Jenkins Agent
+# Use: docker run -d android-jenkins-agent (for Jenkins JNLP agent)
+# Or: docker run -it android-jenkins-agent /bin/bash (for interactive)
+CMD ["tail", "-f", "/dev/null"]
